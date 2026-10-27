@@ -1,0 +1,79 @@
+# Configuration Docker — ignore les données, secrets et artefacts.
+#
+# RÈGLE: on versionne ce qui est écrit à la main (compose, configs, scripts).
+# On ignore ce qui est généré, ce qui est volumineux, et ce qui est secret.
+# Un .env ou un token dans l'historique git est très difficile à retirer
+# (il faut réécrire l'historique); ces fichiers sont déjà couverts par le
+# backup chiffré/600 vers le nuc, donc les ignorer ici ne perd rien.
+
+# --- secrets : jamais dans git ---
+.env
+.env.*
+!.env.example
+*.env
+!.env.example
+*token*
+*token
+.token
+*.key
+*.pem
+*.p12
+auth.json
+client-key.txt
+secrets/
+*watcher.env
+
+# --- données applicatives volumineuses ---
+data/
+cache/
+backups/
+jaeger-badger/
+publisher-data/
+codex-home/
+home/
+config/data/
+*/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.dump
+*.sql
+*.zip
+*.tar
+*.tar.gz
+*.tar.zst
+
+# --- sauvegardes ponctuelles de fichiers de config ---
+*.bak
+*.bak-*
+*.bak.*
+*.failed-*
+*.pre-*
+*.tmp
+*.orig
+*.rej
+*~
+
+# --- artefacts de déploiement GSD (générés par le rollout) ---
+compose.gsd-*.candidate.yaml
+gsd-*-verification.json
+*-verification.json
+binds-manifest.txt
+docker-data/
+
+# --- logs générés ---
+*.log
+
+# --- divers ---
+__pycache__/
+*.pyc
+.gitignore.local
+
+# --- répertoires de configuration générés au runtime par les conteneurs ---
+# (jellyfin/config, transmission/config : logs, métadonnées, états de session.
+#  Ce n'est pas de la config écrite à la main, ça bruite l'historique.)
+# Ignore le répertoire config/ À TOUS LES NIVEAUX (données runtime).
+# Ne touche pas à backup-image/ ni aux fichiers config.yaml (noms différents).
+config/

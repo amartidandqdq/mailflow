@@ -1,0 +1,67 @@
+{
+  "services": {
+    "backend": {
+      "image": "ghcr.io/maathimself/mailflow-backend@sha256:c9e519db488a0a96184b497483f1d70043f571ceadaaa70d7867a7571001fe01",
+      "environment": {
+        "APP_URL": "https://m720q.taild49e80.ts.net:10000",
+        "FRONTEND_URL": "https://m720q.taild49e80.ts.net:10000"
+      },
+      "mem_limit": "2g",
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "frontend": {
+      "image": "ghcr.io/maathimself/mailflow-frontend@sha256:019fc05be149274a21e8bfca212dcf8406f3b0819dfdf7e79433ea2ff32aa623",
+      "environment": {
+        "NGINX_TLS": "off"
+      },
+      "mem_limit": "256m",
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "postgres": {
+      "image": "postgres@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36",
+      "mem_limit": "2g",
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "redis": {
+      "image": "redis@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541",
+      "mem_limit": "1g",
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    }
+  }
+}
