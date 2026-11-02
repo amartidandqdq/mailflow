@@ -1,5 +1,12 @@
 # MailFlow — stack Docker Compose (hôte m720q)
 
+## Maintenance — chemin simple
+
+- Configuration : `compose.yaml` + surcharge locale `compose.override.yaml`, désormais en YAML lisible, sans changement de configuration effective. Les mentions JSON plus bas décrivent l’ancien format.
+- Sauvegarde : le script nocturne existant `backup.sh`, pas de nouveau service. Il sauvegarde Postgres, pas la configuration ni Redis. Un sommaire valide ne prouve pas une restauration.
+- Avant mise à jour : vérifier une sauvegarde et identifier le point de retour. Les fichiers `candidate` et `.bak` restent conservés mais ne sont pas la configuration courante.
+- Contrôles : `docker compose config --quiet`, `docker compose ps`, `tail -n 5 backups/backup.log`. Ne pas partager la configuration complète : elle peut contenir des secrets.
+
 Dépôt de configuration de la stack MailFlow. Il ne contient que la configuration écrite à la main. Les données, les sauvegardes, les secrets et les fichiers `.bak-*` restent locaux et sont ignorés par git.
 
 État documenté au 2026-11-02 (mise à jour suite à l'audit du jour ; certaines sections datées conservent leur date propre), à partir des fichiers du dépôt, de fichiers locaux cités dans le texte (dont le dossier `backups/` et le lien `/home/m720q/mailflow`), de la crontab de l'utilisateur m720q (`crontab -l`) et de la sortie de `tailscale serve status`. Tout ce qui n'a pas été contrôlé est marqué « non vérifié ».
