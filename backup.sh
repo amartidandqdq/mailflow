@@ -1,9 +1,65 @@
 #!/bin/sh
-# Daily pg_dump of the mailflow database, keeps the last 7 dumps.
+# Daily pg_dump (format custom, -Fc) of the mailflow database.
+# - verifies the dump with `pg_restore --list` before keeping it;
+# - appends one timestamped OK/ECHEC line to backups/backup.log;
+# - exits non-zero on any failure (the cron mail / watchdog can see it);
+# - rotation: keeps the last 7 AUTOMATIC dumps only. Automatic dumps are
+#   mailflow-auto-*.dump, plus the legacy name mailflow-AAAAMMJJ-0330.dump
+#   written by the previous version of this script. Manual dumps (pre-update,
+#   failback, any other mailflow-*.dump) are never counted nor removed.
 set -eu
 umask 077  # dumps contain mail data: owner-only
+
 D="$HOME/mailflow/backups"
+LOG="$D/backup.log"
+CT=mailflow-postgres
+KEEP=7
+TS=$(date +%Y%m%d-%H%M)
+OUT="$D/mailflow-auto-$TS.dump"
+TMP="$OUT.tmp"
+CHK="/tmp/backup-check-$$.dump"
+
 mkdir -p "$D"
-docker exec mailflow-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$D/mailflow-$(date +%Y%m%d-%H%M).dump.tmp"
-mv "$D/mailflow-$(date +%Y%m%d-%H%M).dump.tmp" "$D/mailflow-$(date +%Y%m%d-%H%M).dump"
-ls -1t "$D"/mailflow-*.dump | tail -n +8 | xargs -r rm -f
+
+# Writes to the log file only (cron also appends stdout/stderr to the same file).
+log() {
+  printf '%s %s\n' "$(date -Iseconds)" "$*" >> "$LOG"
+  if [ -t 2 ]; then printf '%s\n' "$*" >&2; fi
+}
+
+fail() {
+  log "ECHEC $*"
+  rm -f "$TMP"
+  docker exec "$CT" rm -f "$CHK" >/dev/null 2>&1 || true
+  exit 1
+}
+
+docker exec "$CT" sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$TMP" \
+  || fail "pg_dump a echoue ($OUT)"
+
+SIZE=$(wc -c < "$TMP")
+[ "$SIZE" -gt 0 ] || fail "dump vide ($OUT)"
+
+# pg_restore is not installed on the host: check inside the postgres container
+# (same method as ~/mailflow-sync.sh), or on the host if it is available.
+if command -v pg_restore >/dev/null 2>&1; then
+  LIST=$(pg_restore --list "$TMP" 2>&1) \
+    || fail "pg_restore --list refuse le dump ($OUT)"
+else
+  docker cp "$TMP" "$CT:$CHK" >/dev/null \
+    || fail "docker cp vers $CT impossible ($OUT)"
+  LIST=$(docker exec "$CT" pg_restore --list "$CHK" 2>&1) \
+    || fail "pg_restore --list refuse le dump ($OUT)"
+  docker exec "$CT" rm -f "$CHK" >/dev/null 2>&1 || true
+fi
+
+TABLES=$(printf '%s\n' "$LIST" | grep -c 'TABLE DATA' || true)
+[ "$TABLES" -gt 0 ] || fail "dump sans donnees de table dans le sommaire ($OUT)"
+
+mv "$TMP" "$OUT" || fail "renommage impossible ($TMP)"
+
+# Rotation: automatic dumps only (newest first, drop everything past $KEEP).
+ls -1t "$D"/mailflow-auto-*.dump "$D"/mailflow-????????-0330.dump 2>/dev/null \
+  | tail -n +"$((KEEP + 1))" | xargs -r rm -f
+
+log "OK $(basename "$OUT") ($SIZE octets, $TABLES tables, verifie par pg_restore --list)"
