@@ -3,8 +3,9 @@
 # RÈGLE: on versionne ce qui est écrit à la main (compose, configs, scripts).
 # On ignore ce qui est généré, ce qui est volumineux, et ce qui est secret.
 # Un .env ou un token dans l'historique git est très difficile à retirer
-# (il faut réécrire l'historique); ces fichiers sont déjà couverts par le
-# backup chiffré/600 vers le nuc, donc les ignorer ici ne perd rien.
+# (il faut réécrire l'historique); ces fichiers sont censés être couverts par
+# la sauvegarde vers le nuc (backup-to-nuc.sh, contenu et chiffrement non vérifiés),
+# donc les ignorer ici ne devrait rien faire perdre.
 
 # --- secrets : jamais dans git ---
 .env
@@ -56,7 +57,7 @@ config/data/
 *.rej
 *~
 
-# --- artefacts de déploiement GSD (générés par le rollout) ---
+# --- artefacts de déploiement GSD (supposés générés par le rollout : non vérifié) ---
 compose.gsd-*.candidate.yaml
 gsd-*-verification.json
 *-verification.json
@@ -72,8 +73,11 @@ __pycache__/
 .gitignore.local
 
 # --- répertoires de configuration générés au runtime par les conteneurs ---
-# (jellyfin/config, transmission/config : logs, métadonnées, états de session.
+# (exemples jellyfin/config, transmission/config, absents de ce dépôt : logs, métadonnées, états de session, contenu non vérifié.
 #  Ce n'est pas de la config écrite à la main, ça bruite l'historique.)
 # Ignore le répertoire config/ À TOUS LES NIVEAUX (données runtime).
 # Ne touche pas à backup-image/ ni aux fichiers config.yaml (noms différents).
 config/
+
+# --- certificats TLS montes dans le frontend (./certs:/etc/nginx/ssl, voir compose.yaml) ---
+certs/
