@@ -2,7 +2,7 @@
 
 Dépôt de configuration de la stack MailFlow. Il ne contient que la configuration écrite à la main. Les données, les sauvegardes, les secrets et les fichiers `.bak-*` restent locaux et sont ignorés par git.
 
-État documenté au 2026-10-30, à partir des fichiers du dépôt, de fichiers locaux cités dans le texte (dont le dossier `backups/` et le lien `/home/m720q/mailflow`), de la crontab de l'utilisateur m720q (`crontab -l`) et de la sortie de `tailscale serve status`. Tout ce qui n'a pas été contrôlé est marqué « non vérifié ».
+État documenté au 2026-11-02 (mise à jour suite à l'audit du jour ; certaines sections datées conservent leur date propre), à partir des fichiers du dépôt, de fichiers locaux cités dans le texte (dont le dossier `backups/` et le lien `/home/m720q/mailflow`), de la crontab de l'utilisateur m720q (`crontab -l`) et de la sortie de `tailscale serve status`. Tout ce qui n'a pas été contrôlé est marqué « non vérifié ».
 
 ## Fichiers suivis par git
 
@@ -11,7 +11,7 @@ Dépôt de configuration de la stack MailFlow. Il ne contient que la configurati
 - `backup.sh` : sauvegarde de la base (voir « Sauvegardes »).
 - `.gitignore`.
 
-Ignorés (présents localement) : `.env` et `.env.bak-*`, `backups/`, `compose.gsd-005.candidate.yaml`, les `compose.*.bak-*`, `docker-compose.override.yml.bak-gsd-005-20261027-181231`. Le dossier `certs/` (vide actuellement) est ignoré par `.gitignore` (règle `certs/`, modification non committée : `git status` affiche ` M .gitignore`).
+Ignorés (présents localement) : `.env` et `.env.bak-*`, `backups/`, `compose.gsd-005.candidate.yaml`, les `compose.*.bak-*`, `docker-compose.override.yml.bak-gsd-005-20261027-181231`. Le dossier `certs/` (vide actuellement) est ignoré par `.gitignore` (règle `certs/`).
 
 ## Services
 
@@ -52,9 +52,9 @@ Chemin : `/home/m720q/mailflow` est un lien symbolique vers `/home/m720q/project
 Le fichier `.env` est à la racine, ignoré par git. Son contenu n'est pas documenté ici. Il n'y a pas de `.env.example` dans le dépôt.
 
 - Sans valeur par défaut dans `compose.yaml` : `SESSION_SECRET`, `DB_PASSWORD`, `REDIS_PASSWORD`.
-- Valeur par défaut vide : `APP_URL`, `ENCRYPTION_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `IMAP_MAX_PERSISTENT_PER_HOST`, `TRUST_PROXY_HOPS`, `MS_BUILTIN_APP`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_TENANT_ID`, `MS_REDIRECT_URI`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `NGINX_TLS`, `ACME_EMAIL`.
+- Valeur par défaut vide : `APP_URL`, `ENCRYPTION_KEY` (voir ci-dessous), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `IMAP_MAX_PERSISTENT_PER_HOST`, `TRUST_PROXY_HOPS`, `MS_BUILTIN_APP`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_TENANT_ID`, `MS_REDIRECT_URI`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `NGINX_TLS`, `ACME_EMAIL`.
 - Valeur par défaut non vide : `MAILFLOW_VERSION` (`latest`), `APP_PORT` (`18443`), `APP_HTTP_PORT` (`18081`), `DB_HOST` (`postgres`), `DB_PORT` (`5432`), `DB_NAME` (`mailflow`), `DB_USER` (`mailflow`), `DOMAIN` (`localhost`).
-- Comportement du backend si `ENCRYPTION_KEY` est vide : non vérifié (le code du backend n'est pas dans ce dépôt).
+- `ENCRYPTION_KEY` : d'après l'audit du 2026-11-02, cette clé n'existe que dans `.env` (valeur non lue pour cette mise à jour). Elle n'est ni dans `compose.yaml` (défaut vide), ni dans le dépôt git, ni dans les dumps `pg_dump`. Elle voyage donc seulement avec les copies de `.env` (`.env.bak-*`, `backups/pre-4.0.5-*/.env`, pile de secours pi5max). Perdre `.env` = perdre la clé : en garder une copie hors de la machine, et ne pas la régénérer. Ce que la clé protège exactement et ce qui se passe si elle est vide ou différente : non vérifié (le code du backend n'est pas dans ce dépôt).
 
 ## Images et versions
 
@@ -68,14 +68,15 @@ Le fichier `.env` est à la racine, ignoré par git. Son contenu n'est pas docum
 
 - Script : `backup.sh`. Lancé chaque jour à 03:30 par la crontab de l'utilisateur m720q (`crontab -l`). Journal : `backups/backup.log`, qui reçoit la sortie standard et d'erreur de cette ligne de crontab (`2>&1`).
 - Destination : `$HOME/mailflow/backups`, soit `backups/` dans ce dossier.
-- Méthode : `docker exec mailflow-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc'` (format custom, `backup.sh` l. 7). Le fichier est écrit en `.dump.tmp`, puis renommé en `mailflow-AAAAMMJJ-HHMM.dump` (l. 7-8). `umask 077` : fichiers en 600 (l. 4).
-- Rétention : les 7 plus récents `mailflow-*.dump` au premier niveau de `backups/`. Les sous-dossiers, comme `pre-4.0.5-20261025-211311/`, ne sont pas concernés.
+- Méthode : `docker exec mailflow-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc'` (format custom). Le fichier est écrit en `.dump.tmp`, vérifié, puis renommé en `mailflow-auto-AAAAMMJJ-HHMM.dump`. `umask 077` : fichiers en 600.
+- Rétention (depuis le 2026-11-02) : les 7 plus récents dumps **automatiques** au premier niveau de `backups/` : `mailflow-auto-*.dump` et, pendant la transition, l'ancien format `mailflow-AAAAMMJJ-0330.dump`. Les dumps manuels (`mailflow-AAAAMMJJ-HHMM.dump` hors 03:30, `failback-*`, `pre-failback-*`) ne sont ni comptés ni supprimés. Les sous-dossiers, comme `pre-4.0.5-20261025-211311/`, ne sont pas concernés.
 - Taille observée (7 dumps présents au 2026-10-30, `ls -l`) : de 17 321 393 à 18 468 524 octets, soit 17,3 à 18,5 Mo (10^6 octets), ou 16,5 à 17,6 Mio (2^20 octets).
-- Vérification du dump : aucune. Pas de `pg_restore --list`, pas de contrôle de taille ni de nombre de lignes.
+- Vérification du dump (depuis le 2026-11-02) : taille non nulle, puis `pg_restore --list` (dans le conteneur postgres, car `pg_restore` n'est pas installé sur l'hôte) avec au moins une entrée `TABLE DATA`. En cas d'échec : dump `.tmp` retiré, ligne `ECHEC` dans le journal, code de sortie 1, pas de rotation. Cette version de `backup.sh` n'a été contrôlée que par `bash -n` et `sh -n` : jamais exécutée, premier passage réel attendu au cron de 03:30.
+- Journal : une ligne horodatée `OK …` ou `ECHEC …` par exécution dans `backups/backup.log` (vide à ce jour, dernière écriture du 2026-10-24).
 - Restauration : aucune procédure dans le dépôt. Le format `-Fc` se restaure en principe avec `pg_restore` (usage général de PostgreSQL). Restauration : non vérifié.
-- Autres lignes crontab (lues avec `crontab -l`, contenu des scripts non vérifié) : `backup-to-nuc.sh` à 03:45, `backup-watchdog.sh` à 08:00, et `pihole/backup.sh` à 03:20.
+- Autres lignes crontab (lues avec `crontab -l` le 2026-11-02, contenu des scripts non vérifié) : `backup-to-5max.sh` à 03:45 (remplace `backup-to-nuc.sh`, désactivé le 2026-10-31), `backup-watchdog.sh` à 08:00, `pihole/backup.sh` à 03:20 et `restore-drill-weekly.sh` le dimanche à 04:30.
 - Depuis le 2026-10-31 : `backup-to-5max.sh` (03:45) archive aussi ce dossier vers pi5max (`/mnt/ssd/m720q-backups`) et `mailflow-sync.sh` envoie un dump toutes les heures (voir « Redondance »).
-- Dumps hors horaire observés : `mailflow-20261027-2137`, `mailflow-20261028-1414`, `mailflow-20261030-2036`. Lancement manuel probable, non vérifié.
+- Dumps hors horaire observés : `mailflow-20261027-2137`, `mailflow-20261028-1414`, `mailflow-20261030-2036`, `mailflow-20261102-1159` (ce dernier est la sauvegarde avant mise à jour 4.1.2). Lancement manuel, non vérifié pour les autres.
 
 ## Redondance sur pi5max (ajouté le 2026-10-31)
 
@@ -88,16 +89,16 @@ Principe : actif/passif. m720q sert MailFlow ; pi5max (Orange Pi 5 Max, DietPi, 
 - **Retour** (m720q) : `~/mailflow-failback.sh back` arrête m720q, arrête front/back sur pi5max, exporte sa base, fait une sauvegarde de sécurité `backups/pre-failback-*.dump`, restaure avec `pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error`, redémarre m720q, réannonce le Service, puis exécute `down` sur pi5max. `~/mailflow-failback.sh guard` (cron `@reboot`) arrête front/back de m720q et retire l'annonce si pi5max sert MailFlow. Un chevauchement d'environ une minute est possible au redémarrage (Docker relance les conteneurs avant le garde-fou).
 - **Alerte** : bloc ajouté dans `/root/surveillance.sh` de pi5max (cron toutes les 15 min, notification téléphone via ntfy quand la liste des problèmes change) : deux essais HTTPS sur `m720q…:10000` espacés de 20 s. Sauvegarde du script : `/root/surveillance.sh.bak-20261031`. Indépendant de m720q (le watchdog `backup-watchdog.sh` de m720q passe par le conteneur hermes de m720q et se tait si m720q tombe).
 - **Vérifié le 2026-10-31** : accès à `https://mailflow.taild49e80.ts.net/` confirmé par Alex (fonctionne très bien) ; restauration d'un vrai dump dans `postgres:16-alpine` sur pi5max (34 tables, comme m720q) ; Service joignable depuis le nuc (HTTP 200) ; refus de `up` tant que m720q répond ; envoi horaire des dumps ; alerte simulée sur mauvaise IP.
-- **Non testé** : `mailflow-failover.sh up` et `mailflow-failback.sh back` en conditions réelles ; comportement du Service quand m720q tombe vraiment.
+- **Bascule en conditions réelles** : artefacts de bascule présents du 2026-11-01 (`backups/failback-20261101-0940.dump` et `backups/pre-failback-20261101-0940.dump`, créés à 09:40), résultat non documenté (aucun journal ni compte rendu dans le dépôt ; ces fichiers prouvent qu'un `back` a démarré, pas qu'il a abouti). Comportement du Service quand m720q tombe vraiment : non testé.
 - **Limite connue** : pi5max n'utilise pas MagicDNS (`CorpDNS` désactivé) et n'atteint pas le Service depuis lui-même (test par nom et par VIP en échec le 2026-10-31).
 
-## Points connus (état au 2026-10-30)
+## Points connus (état au 2026-10-30, mis à jour le 2026-11-02 là où indiqué)
 
 - Pas de dump `mailflow-20261030-0330.dump` (présents : `20261029-0330` et `20261030-2036`). Cause : non vérifiée.
-- `backups/backup.log` fait 0 octet, dernière modification le 2026-10-24 à 03:30:01. `backup.sh` n'écrit rien en cas de succès : un journal vide ne prouve ni succès ni échec.
-- `backups/pre-4.0.5-20261025-211311/` est hors rétention. Il contient `mailflow.dump` (16,5 Mio, `ls -lh`), `table-counts.json`, `docker-compose.yml`, `docker-compose.override.yml` et un fichier nommé `.env` (contenu non lu). Le dossier est en 700.
-- `backups/ai_config-20261028-182903.json` est en 664 (lisible par les autres utilisateurs). Il contient un champ de clé d'API en clair. La valeur n'est pas reproduite ici.
-- Les sauvegardes sont dans le dossier du projet, ignoré par git (`backups/` dans `.gitignore`). Une copie hors de ce dossier est peut-être faite par la ligne crontab `backup-to-nuc.sh` (03:45) : contenu et effet non vérifiés.
+- `backups/backup.log` fait 0 octet, dernière modification le 2026-10-24 à 03:30:01. L'ancienne version de `backup.sh` n'écrivait rien en cas de succès : un journal vide ne prouve ni succès ni échec. La nouvelle version écrit une ligne par exécution (non encore exécutée).
+- `backups/pre-4.0.5-20261025-211311/` est hors rétention. Il contient `mailflow.dump` (16,5 Mio, `ls -lh`), `table-counts.json`, `docker-compose.yml`, `docker-compose.override.yml` et un fichier nommé `.env` (contenu non lu). Le dossier est en 700, le fichier `.env` en 600 (contrôlé le 2026-11-02, contenu non lu).
+- `backups/ai_config-20261028-182903.json` contient un champ de clé d'API en clair (valeur non reproduite ici, fichier non lu). Il a été passé de 664 à 600 le 2026-11-02. Le fichier reste présent : suppression ou archivage chiffré à décider.
+- Les sauvegardes sont dans le dossier du projet, ignoré par git (`backups/` dans `.gitignore`). Une copie hors de ce dossier est faite vers pi5max par `backup-to-5max.sh` (03:45, voir ci-dessous) : contenu exact non vérifié.
 - Les dumps contiennent des données de messagerie (commentaire de `backup.sh`, l. 4).
 
 ## Points ouverts (décisions hors de ce dépôt)
@@ -110,22 +111,22 @@ Principe : actif/passif. m720q sert MailFlow ; pi5max (Orange Pi 5 Max, DietPi, 
 - Valeur de `TRUST_PROXY_HOPS` à confirmer.
 - Échec de `ENCRYPTION_KEY` vide : à décider (échec immédiat ou comportement actuel).
 - Digests effectifs et version MailFlow à réconcilier.
-- Vérification des sauvegardes et journalisation de `backup.sh` à ajouter.
+- Premier passage réel de la nouvelle version de `backup.sh` (vérification + journal) à contrôler après le cron de 03:30. Passage progressif des anciens dumps `mailflow-*-0330.dump` au nouveau nommage.
 - Cause de l'absence du dump du 2026-10-30 03:30 à identifier.
-- Permissions de `backups/ai_config-20261028-182903.json` (600 minimum) ou suppression.
+- Suppression ou archivage chiffré de `backups/ai_config-20261028-182903.json` (permissions déjà en 600).
 - Redondance : test réel de bascule et de retour ; alerte « nuc (secours DNS) ne repond plus » préexistante dans la surveillance de pi5max.
 
 ## Non vérifié
 
 - Contenu de `.env` et des fichiers `.env.bak-*`.
-- Contenu de `backup-to-nuc.sh`, `backup-watchdog.sh` et `pihole/backup.sh`.
+- Contenu de `backup-to-5max.sh`, `backup-watchdog.sh` et `pihole/backup.sh`.
 - Comportement du backend (code absent du dépôt).
 - État réel des conteneurs et des volumes.
 - Restaurabilité des dumps.
 
 ### Mise à jour 2026-10-31 (après les tests sur Kanban-AO et OpenTodo)
 - `mailflow-failover.sh` (pi5max) utilise maintenant `sudo -n tailscale serve` (sans cela, l'annonce échouait : dietpi n'est pas opérateur), attend le certificat HTTPS de l'adresse avant de rendre la main, et son contrôle « m720q répond ? » regarde le code HTTP (< 500). Sauvegarde : `mailflow-failover.sh.bak-20261031b`. Le bloc d'alerte de `/root/surveillance.sh` utilise la même règle.
-- Toujours non testé en réel : `up` et `back` de MailFlow (même méthode que celle validée sur Kanban-AO et OpenTodo, voir `~/RESTORE-RUNBOOK.md`).
+- `up` et `back` de MailFlow en réel : voir « Bascule en conditions réelles » ci-dessus, résultat non documenté (même méthode que celle validée sur Kanban-AO et OpenTodo, voir `~/RESTORE-RUNBOOK.md`).
 
 ## Correctifs bascule du 2026-11-01 (audit + tests de restaurabilité)
 
@@ -143,5 +144,5 @@ Principe : actif/passif. m720q sert MailFlow ; pi5max (Orange Pi 5 Max, DietPi, 
 - Sauvegardes des versions précédentes : *.bak-20261101 (m720q) et
   pihole:~/mailflow/mailflow-failover.sh.bak-20261101.
 - Vérifié : up refuse quand m720q répond (HTTP 200) ; syntaxe bash validée sur les trois scripts.
-- Reste : test réel de bascule/retour (voir TEST-BASCULE.md).
+- Reste : documenter le résultat de la bascule/retour du 2026-11-01 (artefacts présents, voir TEST-BASCULE.md pour la procédure).
 
