@@ -17,7 +17,6 @@ KEEP=7
 TS=$(date +%Y%m%d-%H%M)
 OUT="$D/mailflow-auto-$TS.dump"
 TMP="$OUT.tmp"
-CHK="/tmp/backup-check-$$.dump"
 
 mkdir -p "$D"
 
@@ -30,7 +29,6 @@ log() {
 fail() {
   log "ECHEC $*"
   rm -f "$TMP"
-  docker exec "$CT" rm -f "$CHK" >/dev/null 2>&1 || true
   exit 1
 }
 
@@ -40,18 +38,10 @@ docker exec "$CT" sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$
 SIZE=$(wc -c < "$TMP")
 [ "$SIZE" -gt 0 ] || fail "dump vide ($OUT)"
 
-# pg_restore is not installed on the host: check inside the postgres container
-# (same method as ~/mailflow-sync.sh), or on the host if it is available.
-if command -v pg_restore >/dev/null 2>&1; then
-  LIST=$(pg_restore --list "$TMP" 2>&1) \
-    || fail "pg_restore --list refuse le dump ($OUT)"
-else
-  docker cp "$TMP" "$CT:$CHK" >/dev/null \
-    || fail "docker cp vers $CT impossible ($OUT)"
-  LIST=$(docker exec "$CT" pg_restore --list "$CHK" 2>&1) \
-    || fail "pg_restore --list refuse le dump ($OUT)"
-  docker exec "$CT" rm -f "$CHK" >/dev/null 2>&1 || true
-fi
+# Use the matching Postgres tools through stdin: no host dependency,
+# docker cp, or temporary file to clean up inside the container.
+LIST=$(docker exec -i "$CT" pg_restore --list < "$TMP" 2>&1) \
+  || fail "pg_restore --list refuse le dump ($OUT)"
 
 TABLES=$(printf '%s\n' "$LIST" | grep -c 'TABLE DATA' || true)
 [ "$TABLES" -gt 0 ] || fail "dump sans donnees de table dans le sommaire ($OUT)"
