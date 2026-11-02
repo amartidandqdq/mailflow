@@ -1,10 +1,10 @@
 {
   "services": {
     "backend": {
-      "image": "ghcr.io/maathimself/mailflow-backend@sha256:0bc1daccfcd1bb532145624569faaff7d4796da016f0dfb2fd4dc9ba17fa7eeb",
+      "image": "ghcr.io/maathimself/mailflow-backend@sha256:1f70c4de94ad1c9604717dfbb737ddafc844ba6e20f76084c1c483580d3fe7be",
       "environment": {
-        "APP_URL": "https://m720q.taild49e80.ts.net:10000",
-        "FRONTEND_URL": "https://m720q.taild49e80.ts.net:10000"
+        "APP_URL": "https://mailflow.taild49e80.ts.net",
+        "FRONTEND_URL": "https://mailflow.taild49e80.ts.net"
       },
       "mem_limit": "2g",
       "security_opt": [
@@ -19,7 +19,7 @@
       }
     },
     "frontend": {
-      "image": "ghcr.io/maathimself/mailflow-frontend@sha256:1477a36a63308bae59e3ed66cee2072188793ab18e3c8b7ba757f5ddd7e7f62b",
+      "image": "ghcr.io/maathimself/mailflow-frontend@sha256:6b9b03a53663c0d9dfeace31c4f056a4437b40783b34c755d2dd76f7fedd5a16",
       "environment": {
         "NGINX_TLS": "off"
       },
