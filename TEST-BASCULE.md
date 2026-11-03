@@ -1,12 +1,12 @@
 # MailFlow — Plan de test de bascule m720q → pi5max
 
 Machine primaire : **m720q** (~/mailflow, docker compose) — Service Tailscale : <https://mailflow.taild49e80.ts.net>
-Machine de secours : **pi5max** (alias SSH `pihole`, ~/mailflow, dumps horaires dans `~/mailflow/backups-hourly/`)
+Machine de secours : **pi5max** (alias SSH `pihole`, ~/mailflow, dumps toutes les 10 min dans `~/mailflow/backups-hourly/`)
 
 ## 0. Rappels de sécurité (à lire avant tout)
 
 - **Ne jamais faire tourner les deux piles en même temps** : deux clients IMAP sur les mêmes boîtes corrompraient les données. La bascule comme le retour arrêtent toujours un côté avant de démarrer l'autre.
-- **Perte de données maximale : ~1 h** — la synchro m720q → pi5max (`~/mailflow-sync.sh`) tourne chaque heure à la minute :05 et conserve 24 dumps. Tout ce qui est arrivé depuis le dernier dump horaire est perdu en cas de bascule.
+- **Perte de données maximale : ~10 min** — la synchro m720q → pi5max (`~/mailflow-sync.sh`) tourne toutes les 10 minutes et conserve 120 dumps (~20 h). Tout ce qui est arrivé depuis le dernier dump (au plus ~10 min) est perdu en cas de bascule.
 - **Les sessions Redis ne sont pas copiées** : tous les utilisateurs devront se reconnecter après la bascule ET après le retour.
 - **Le certificat HTTPS du Service est préchauffé** par le script pi5max (`tailscale cert`, ~35 s au premier appel), la reprise HTTP est donc rapide.
 - Le script pi5max refuse `up` si m720q répond encore (sonde HTTP sur `https://m720q.taild49e80.ts.net:10000/`). `--force` n'est à utiliser qu'après avoir **vérifié** que la pile m720q est bien arrêtée.
@@ -18,7 +18,7 @@ Machine de secours : **pi5max** (alias SSH `pihole`, ~/mailflow, dumps horaires 
 ```bash
 # 1. Pile m720q saine
 cd ~/mailflow && docker compose ps            # postgres/backend/frontend : Up (healthy)
-# 2. Dernier dump horaire récent (<= 1 h)
+# 2. Dernier dump récent (<= 20 min)
 tail -n 1 ~/mailflow-sync.log                 # ligne "... OK mailflow-AAAAMMJJ-HHMM.dump"
 # 3. Accès SSH à pi5max
 ssh pihole true && echo SSH-OK
@@ -49,7 +49,7 @@ Attendu : `200` (m720q répond).
 
 ## 2. Fenêtre conseillée et estimation de coupure
 
-- **Fenêtre** : hors heures d'utilisation (soirée tardive / nuit, ou créneau convenu avec les utilisateurs), **juste après le passage de l'heure** (dump :05) pour minimiser la perte potentielle. Prévenir les utilisateurs : double reconnexion prévue (Redis).
+- **Fenêtre** : hors heures d'utilisation (soirée tardive / nuit, ou créneau convenu avec les utilisateurs) ; la synchro passe toutes les 10 minutes, la perte potentielle est donc d'environ 10 min à tout moment. Prévenir les utilisateurs : double reconnexion prévue (Redis).
 - **Durée totale du test : ~20 à 30 min.**
 
 | Phase | Coupure HTTP estimée | Détail |
@@ -57,7 +57,7 @@ Attendu : `200` (m720q répond).
 | Arrêt m720q | immédiat | serve off + conteneurs stoppés |
 | Bascule pi5max | ~2 à 5 min | `down -v`, postgres healthy (~30 s), pg_restore, `up -d`, annonce svc + cert préchauffé (~35 s) |
 | Failback | ~3 à 8 min | export pg_dump pi5max, dump de sécurité m720q, pg_restore, healthchecks, serve |
-| Perte de données | 0 à ~1 h | selon l'heure du dernier dump horaire |
+| Perte de données | 0 à ~10 min | selon l'heure du dernier dump |
 
 ## 3. Étapes du test
 
@@ -97,7 +97,7 @@ ssh pihole '~/mailflow/mailflow-failover.sh up'
 
 Sans `--force`, le script doit accepter (m720q ne répond plus). Résultats attendus dans la sortie :
 
-- `Dump utilisé: .../mailflow-AAAAMMJJ-HHMM.dump (<date>)` — **vérifier que l'horodatage correspond au dernier dump horaire connu** ;
+- `Dump utilisé: .../mailflow-AAAAMMJJ-HHMM.dump (<date>)` — **vérifier que l'horodatage correspond au dernier dump connu** ;
 - postgres healthy, `docker compose up -d` complet ;
 - annonce `svc:mailflow` sans message ATTENTION ;
 - préchauffage du certificat (`tailscale cert`) sans erreur.
@@ -124,7 +124,7 @@ Attendu : `200` (réponse rapide grâce au certificat préchauffé).
 ### Étape 3 — Validation fonctionnelle sur la secours
 
 1. **Connexion réelle** à <https://mailflow.taild49e80.ts.net> avec le compte de test (une reconnexion est normale : sessions Redis non copiées).
-2. **Compte d'e-mails** : le nombre de messages doit correspondre au relevé initial **moins** les messages reçus depuis le dernier dump horaire (perte attendue ≤ 1 h).
+2. **Compte d'e-mails** : le nombre de messages doit correspondre au relevé initial **moins** les messages reçus depuis le dernier dump (perte attendue ≤ 10 min).
 3. **Test d'écriture** : envoyer un e-mail de test depuis l'interface — il servira de preuve au rapatriement lors du failback.
 
 ### Étape 4 — Retour arrière planifié (failback)
@@ -161,7 +161,7 @@ cd ~/mailflow && docker compose ps
 tailscale serve status | grep -A1 svc:mailflow
 # 5. pi5max bien éteint
 ssh pihole 'docker ps --format "{{.Names}}" | grep mailflow || echo aucun'
-# 6. La synchro horaire repart (après le passage de l'heure :05)
+# 6. La synchro toutes les 10 min repart (au prochain multiple de 10 min)
 tail -n 2 ~/mailflow-sync.log     # nouvelle ligne "... OK mailflow-*.dump"
 # 7. Garde-fou reboot toujours actif
 crontab -l | grep failback
@@ -186,7 +186,7 @@ crontab -l | grep failback
   ssh pihole '~/mailflow/mailflow-failover.sh down'   # une fois m720q confirmé OK
   ```
   En cas d'échec de cette restauration : `docker compose down -v && docker compose up -d` puis restaurer `backups/pre-failback-*.dump` (état m720q d'avant le retour) — on perd alors uniquement ce qui a été écrit sur la secours.
-- **Filet de sécurité global** : dumps horaires sur pi5max (24 h de profondeur), dumps nocturnes `~/mailflow/backups/mailflow-*.dump` sur m720q (7 jours).
+- **Filet de sécurité global** : dumps toutes les 10 min sur pi5max (~20 h de profondeur), dumps nocturnes `~/mailflow/backups/mailflow-*.dump` sur m720q (7 jours).
 
 ## 5. Checklist finale
 
@@ -199,7 +199,7 @@ crontab -l | grep failback
 - [ ] `mailflow-failback.sh back` : 6/6 étapes, export > 1 Mo
 - [ ] Point de contrôle n°3 : `200`
 - [ ] Post-retour : connexion réelle OK, e-mail de secours présent, cycle mail réel OK
-- [ ] pi5max éteint, synchro horaire relancée, `guard` toujours en cron
+- [ ] pi5max éteint, synchro toutes les 10 min relancée, `guard` toujours en cron
 - [ ] Restore de :10000 remis sur m720q si retiré à l'étape 1
 
 ---

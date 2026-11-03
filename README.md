@@ -9,7 +9,7 @@
 
 Dépôt de configuration de la stack MailFlow. Il ne contient que la configuration écrite à la main. Les données, les sauvegardes, les secrets et les fichiers `.bak-*` restent locaux et sont ignorés par git.
 
-État documenté au 2026-11-02 (mise à jour suite à l'audit du jour ; certaines sections datées conservent leur date propre), à partir des fichiers du dépôt, de fichiers locaux cités dans le texte (dont le dossier `backups/` et le lien `/home/m720q/mailflow`), de la crontab de l'utilisateur m720q (`crontab -l`) et de la sortie de `tailscale serve status`. Tout ce qui n'a pas été contrôlé est marqué « non vérifié ».
+État documenté au 2026-11-03 (mise à jour 4.2.0, Redis 7.4.12 et synchro toutes les 10 minutes ; l'audit du 2026-11-02 reste la base, et certaines sections datées conservent leur date propre), à partir des fichiers du dépôt, de fichiers locaux cités dans le texte (dont le dossier `backups/` et le lien `/home/m720q/mailflow`), de la crontab de l'utilisateur m720q (`crontab -l`) et de la sortie de `tailscale serve status`. Tout ce qui n'a pas été contrôlé est marqué « non vérifié ».
 
 ## Fichiers suivis par git
 
@@ -65,9 +65,9 @@ Le fichier `.env` est à la racine, ignoré par git. Son contenu n'est pas docum
 
 ## Images et versions
 
-- Les images backend et frontend, ainsi que postgres et redis, sont figées par digest dans `compose.override.yaml`. Ces digests sont ceux de `compose.override.yaml` dans HEAD (fichier identique à HEAD au contrôle du 2026-10-30). La clé `image` de l'override remplace celle de `compose.yaml` (l. 18 et 43). `MAILFLOW_VERSION` n'a donc aucun effet sur backend et frontend.
+- Les images backend et frontend, ainsi que postgres et redis, sont figées par digest dans `compose.override.yaml`. Ces digests sont ceux de `compose.override.yaml` dans HEAD (fichier identique à HEAD au contrôle du 2026-11-03). La clé `image` de l'override remplace celle de `compose.yaml` (l. 18 et 43). `MAILFLOW_VERSION` n'a donc aucun effet sur backend et frontend.
 - Depuis le 2026-11-03, backend et frontend sont en v4.2.0 (v4.1.2 avant) : backend `sha256:d0a387d4…f67`, frontend `sha256:2eeab7f3…761` (digests complets dans `compose.override.yaml`). Version confirmée par les labels d'image (4.2.0, révision du tag `v4.2.0`) ; HTTP 200 en local et sur l'adresse tailnet ; conteneurs healthy. Migration `0073_email_accounts_sort_order_renumber` appliquée au démarrage. Sauvegarde avant mise à jour : `backups/mailflow-20261103-1931.dump` ; retour arrière : `compose.override.yaml.bak-pre-4.2.0-20261103` et ce dump. Pile de secours pi5max : mêmes digests 4.2.0 depuis le 2026-11-03 (images arm64 tirées, pile restée arrêtée, démarrage non testé ; retour arrière : `compose.override.yaml.bak-pre-4.2.0-20261103` sur pi5max).
-- Version MailFlow correspondant aux autres digests (postgres, redis) : non vérifié.
+- Depuis le 2026-11-03, Redis est en 7.4.12 (`sha256:1cf73a2f…`), correctif du débordement de tampon dans la propagation des PUBLISH de plus de 4 Go ; `redis_version` vérifié dans le conteneur, clés conservées et backend reconnecté après la bascule. PostgreSQL répond en 16.15 (vérifié le 2026-11-03).
 - `compose.override.yaml.bak-pre-4.1.1-20261030` contient d'autres digests de backend et de frontend. Ils ne correspondent ni à la configuration active ni à HEAD. Quels digests tournent réellement : non vérifié.
 - `compose.gsd-005.candidate.yaml` (ignoré) répète `mem_limit`, `security_opt` et `logging` des quatre services, à l'identique de l'override. Il ne contient pas de clé `image` pour backend et frontend, mais contient celles de postgres et redis, identiques à l'override. Il n'est pas utilisé par `compose.yaml` ni par l'override.
 
