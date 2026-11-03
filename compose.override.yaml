@@ -36,7 +36,7 @@ services:
         max-size: "10m"
         max-file: "3"
   redis:
-    image: "redis@sha256:1cf73a2f04808e55a8bd2f5706c2aa0ebb0f71938f93deb7af79f48311cd5cb9"
+    image: "redis@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f"
     mem_limit: "1g"
     security_opt:
       - "no-new-privileges:true"
