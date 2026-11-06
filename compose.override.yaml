@@ -26,7 +26,7 @@ services:
         max-size: "10m"
         max-file: "3"
   postgres:
-    image: "postgres@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36"
+    image: "postgres@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139"
     mem_limit: "2g"
     security_opt:
       - "no-new-privileges:true"
@@ -36,7 +36,7 @@ services:
         max-size: "10m"
         max-file: "3"
   redis:
-    image: "redis@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f"
+    image: "redis@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b"
     mem_limit: "1g"
     security_opt:
       - "no-new-privileges:true"
