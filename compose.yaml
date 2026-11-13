@@ -20,17 +20,21 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${APP_PORT:-18443}:443"
+      - "127.0.0.1:${APP_PORT:-18443}:443/udp"
       - "127.0.0.1:${APP_HTTP_PORT:-18081}:80"
     environment:
-      # off: HTTP on port 80 only, behind your own TLS-terminating proxy (#516).
+      # off: HTTP on port 80 only, behind your own TLS-terminating proxy.
+      TLS_MODE: ${TLS_MODE:-}
       NGINX_TLS: ${NGINX_TLS:-}
     volumes:
-      - ./certs:/etc/nginx/ssl
+      - ./certs:/etc/mailflow/certs
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO/dev/null http://127.0.0.1:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO/dev/null http://127.0.0.1:2080/healthz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -62,7 +66,6 @@ services:
       DB_NAME: ${DB_NAME:-mailflow}
       DB_USER: ${DB_USER:-mailflow}
       DB_PASSWORD: ${DB_PASSWORD}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
@@ -80,10 +83,9 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      FIRST_USER_REGISTRATION: ${FIRST_USER_REGISTRATION:-}
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - mailflow
@@ -108,75 +110,11 @@ services:
     networks:
       - mailflow
 
-  # ── Redis (sessions + caching) ───────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: mailflow-redis
-    restart: unless-stopped
-    # Mot de passe lu depuis l'environnement (pas d'argv visible dans `ps`) ; REDISCLI_AUTH sert au healthcheck.
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      REDISCLI_AUTH: ${REDIS_PASSWORD}
-    command: ["sh", "-c", "exec redis-server --save 60 1 --loglevel warning --requirepass \"$$REDIS_PASSWORD\""]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-    networks:
-      - mailflow
-
-  # ── Caddy (automatic HTTPS via Let's Encrypt — optional) ────────────────────
-  # Use docker-compose.https.yml to avoid the port conflict with the frontend:
-  #   docker compose -f docker-compose.yml -f docker-compose.https.yml --profile https up -d
-  # Requires DOMAIN, ACME_EMAIL, and APP_URL to be set in .env, and ports 80/443 open.
-  caddy:
-    profiles: ["https"]
-    image: caddy:2-alpine
-    container_name: mailflow-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      DOMAIN: ${DOMAIN:-localhost}
-      ACME_EMAIL: ${ACME_EMAIL:-}
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    configs:
-      - source: caddyfile
-        target: /etc/caddy/Caddyfile
-    depends_on:
-      - frontend
-    networks:
-      - mailflow
-
 volumes:
   postgres_data:
-  redis_data:
   caddy_data:
   caddy_config:
 
 networks:
   mailflow:
     driver: bridge
-
-configs:
-  caddyfile:
-    content: |
-      {
-          email ${ACME_EMAIL:-}
-      }
-
-      ${DOMAIN:-localhost} {
-          reverse_proxy frontend:443 {
-              transport http {
-                  tls_insecure_skip_verify
-              }
-          }
-      }

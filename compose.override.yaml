@@ -1,7 +1,7 @@
 # Configuration locale de production, chargée automatiquement avec compose.yaml.
 services:
   backend:
-    image: "ghcr.io/maathimself/mailflow-backend@sha256:36d35701354936797edb92b30ad6a998d52fcad03dace08e758a5bdd2a86e943"
+    image: "ghcr.io/maathimself/mailflow-backend@sha256:db540d4bc86da0de6e3c8fe86b0b0b79b42caeb245beb8231d7a4b4428306e5d"
     environment:
       APP_URL: "https://mailflow.taild49e80.ts.net"
       FRONTEND_URL: "https://mailflow.taild49e80.ts.net"
@@ -14,9 +14,9 @@ services:
         max-size: "10m"
         max-file: "3"
   frontend:
-    image: "ghcr.io/maathimself/mailflow-frontend@sha256:3c8a42715cec8726bd370f4e724d630a4f2271ca95d25dcf92fa34956a9803f6"
+    image: "ghcr.io/maathimself/mailflow-frontend@sha256:74be6c108479985214fe54ac30c14fabe64c7a80a54100f80ad2b89b45fa6f43"
     environment:
-      NGINX_TLS: "off"
+      TLS_MODE: "off"
     mem_limit: "256m"
     security_opt:
       - "no-new-privileges:true"
@@ -28,16 +28,6 @@ services:
   postgres:
     image: "postgres@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139"
     mem_limit: "2g"
-    security_opt:
-      - "no-new-privileges:true"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-  redis:
-    image: "redis@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b"
-    mem_limit: "1g"
     security_opt:
       - "no-new-privileges:true"
     logging:
