@@ -1,7 +1,7 @@
 # Configuration locale de production, chargée automatiquement avec compose.yaml.
 services:
   backend:
-    image: "ghcr.io/maathimself/mailflow-backend@sha256:1f70c4de94ad1c9604717dfbb737ddafc844ba6e20f76084c1c483580d3fe7be"
+    image: "ghcr.io/maathimself/mailflow-backend@sha256:1376df954db75ccd127d6937c24c1bf7f4183fc4e141f75b66e22c9bd2dc1998"
     environment:
       APP_URL: "https://mailflow.taild49e80.ts.net"
       FRONTEND_URL: "https://mailflow.taild49e80.ts.net"
@@ -14,7 +14,7 @@ services:
         max-size: "10m"
         max-file: "3"
   frontend:
-    image: "ghcr.io/maathimself/mailflow-frontend@sha256:6b9b03a53663c0d9dfeace31c4f056a4437b40783b34c755d2dd76f7fedd5a16"
+    image: "ghcr.io/maathimself/mailflow-frontend@sha256:bda596d18aabb510a3e88d82871e5b709914666c2ee5347e58e2169f2c9ba1c1"
     environment:
       NGINX_TLS: "off"
     mem_limit: "256m"
